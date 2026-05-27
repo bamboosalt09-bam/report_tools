@@ -24,6 +24,12 @@ npm run dev
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+Supabase의 legacy anon key를 쓰는 경우에는 아래 변수명도 지원합니다.
+
+```env
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
@@ -37,5 +43,5 @@ Vercel에서 이 저장소를 import하고 Framework Preset을 `Next.js`로 설�
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://rgrlzfkfkzenvovgiush.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```

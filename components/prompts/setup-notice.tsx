@@ -13,8 +13,12 @@ export function SupabaseSetupNotice() {
         </p>
         <div className="rounded-md bg-muted p-3 font-mono text-xs text-foreground">
           <p>NEXT_PUBLIC_SUPABASE_URL=...</p>
-          <p>NEXT_PUBLIC_SUPABASE_ANON_KEY=...</p>
+          <p>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...</p>
         </div>
+        <p>
+          Supabase에서 legacy anon key를 쓰는 경우에는
+          <code> NEXT_PUBLIC_SUPABASE_ANON_KEY</code>로 넣어도 됩니다.
+        </p>
         <p>
           DB 테이블과 보안 정책은 <code>supabase/schema.sql</code>을 Supabase
           SQL Editor에서 실행하면 됩니다.
