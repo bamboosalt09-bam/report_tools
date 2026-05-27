@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Report Tools
 
-## Getting Started
+브라우저에서 쓰는 보고서 보조 도구입니다.
 
-First, run the development server:
+## 기능
+
+- 글자수, 단어수, 나이스 기준 바이트 검사
+- 이미지 포맷 변환
+- PDF 병합, 분할, 회전
+- Supabase 기반 프롬프트 커뮤니티
+
+## 로컬 실행
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+개발 서버는 기본적으로 `http://localhost:3000`에서 실행됩니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 환경변수
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+프롬프트 커뮤니티 기능을 사용하려면 `.env.local`에 Supabase 값을 넣어야 합니다.
 
-## Learn More
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
 
-To learn more about Next.js, take a look at the following resources:
+Supabase SQL Editor에서 `supabase/schema.sql`을 실행하면 필요한 테이블과 RLS 정책이 생성됩니다.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 배포
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Vercel에서 이 저장소를 import하고 Framework Preset을 `Next.js`로 설정합니다.
 
-## Deploy on Vercel
+환경변수에는 다음 값을 등록합니다.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://rgrlzfkfkzenvovgiush.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
