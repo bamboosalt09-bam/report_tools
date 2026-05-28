@@ -32,6 +32,7 @@ import {
   getPromptCategoryLabel,
   promptCategoryOptions,
 } from "@/lib/community-prompts";
+import { getAnonymousLikeId } from "@/lib/anonymous-likes";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PromptRow } from "@/lib/supabase/types";
 
@@ -81,6 +82,7 @@ export function PromptCommunity() {
   const [currentRole, setCurrentRole] = useState<"user" | "admin" | null>(
     null
   );
+  const [anonymousLikeId, setAnonymousLikeId] = useState<string | null>(null);
 
   const user = session?.user ?? null;
   const verified = isEmailVerified(user);
@@ -137,6 +139,16 @@ export function PromptCommunity() {
         for (const like of viewerLikeRows ?? []) {
           viewerLiked.add(like.prompt_id);
         }
+      } else if (anonymousLikeId) {
+        const { data: viewerLikeRows } = await supabase
+          .from("prompt_likes")
+          .select("prompt_id")
+          .eq("anon_id", anonymousLikeId)
+          .in("prompt_id", promptIds);
+
+        for (const like of viewerLikeRows ?? []) {
+          viewerLiked.add(like.prompt_id);
+        }
       }
     }
 
@@ -156,7 +168,7 @@ export function PromptCommunity() {
       }))
     );
     setIsLoading(false);
-  }, [supabase, user]);
+  }, [anonymousLikeId, supabase, user]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -173,6 +185,14 @@ export function PromptCommunity() {
 
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAnonymousLikeId(getAnonymousLikeId());
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -314,17 +334,10 @@ export function PromptCommunity() {
   const handleLike = async (prompt: CommunityPrompt) => {
     if (!supabase) return;
 
-    if (!user) {
-      toast.error("로그인 후 좋아요를 누를 수 있습니다.");
-      return;
-    }
-
-    if (!verified) {
-      toast.error("이메일 인증 후 좋아요를 누를 수 있습니다.");
-      return;
-    }
-
     const nextLiked = !prompt.viewerLiked;
+    const visitorId = anonymousLikeId ?? getAnonymousLikeId();
+    if (!anonymousLikeId) setAnonymousLikeId(visitorId);
+
     setPrompts((current) =>
       current.map((item) =>
         item.id === prompt.id
@@ -337,15 +350,21 @@ export function PromptCommunity() {
       )
     );
 
-    const result = nextLiked
-      ? await supabase
-          .from("prompt_likes")
-          .insert({ prompt_id: prompt.id, user_id: user.id })
-      : await supabase
-          .from("prompt_likes")
-          .delete()
-          .eq("prompt_id", prompt.id)
-          .eq("user_id", user.id);
+    const result = user
+      ? nextLiked
+        ? await supabase
+            .from("prompt_likes")
+            .insert({ prompt_id: prompt.id, user_id: user.id })
+        : await supabase
+            .from("prompt_likes")
+            .delete()
+            .eq("prompt_id", prompt.id)
+            .eq("user_id", user.id)
+      : await supabase.rpc("toggle_anonymous_prompt_like", {
+          target_prompt_id: prompt.id,
+          visitor_id: visitorId,
+          should_like: nextLiked,
+        });
 
     if (result.error) {
       toast.error(result.error.message);

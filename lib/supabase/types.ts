@@ -83,13 +83,17 @@ export interface Database {
       };
       prompt_likes: {
         Row: {
+          id: string;
           prompt_id: string;
-          user_id: string;
+          user_id: string | null;
+          anon_id: string | null;
           created_at: string;
         };
         Insert: {
+          id?: string;
           prompt_id: string;
-          user_id: string;
+          user_id?: string | null;
+          anon_id?: string | null;
           created_at?: string;
         };
         Update: never;
@@ -149,6 +153,14 @@ export interface Database {
       increment_prompt_copy_count: {
         Args: { target_prompt_id: string };
         Returns: void;
+      };
+      toggle_anonymous_prompt_like: {
+        Args: {
+          target_prompt_id: string;
+          visitor_id: string;
+          should_like: boolean;
+        };
+        Returns: boolean;
       };
     };
     Enums: Record<string, never>;

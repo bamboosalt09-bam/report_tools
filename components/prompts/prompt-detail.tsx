@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, Heart } from "lucide-react";
 import { toast } from "sonner";
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SupabaseSetupNotice } from "@/components/prompts/setup-notice";
 import { getPromptCategoryLabel } from "@/lib/community-prompts";
+import { getAnonymousLikeId } from "@/lib/anonymous-likes";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PromptRow } from "@/lib/supabase/types";
 
@@ -31,19 +32,15 @@ interface PromptDetailData {
   viewerLiked: boolean;
 }
 
-function isEmailVerified(user: User | null): boolean {
-  return Boolean(user?.email_confirmed_at ?? user?.confirmed_at);
-}
-
 export function PromptDetail({ promptId }: { promptId: string }) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [prompt, setPrompt] = useState<PromptDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(() => Boolean(supabase));
   const [copied, setCopied] = useState(false);
+  const [anonymousLikeId, setAnonymousLikeId] = useState<string | null>(null);
 
   const user = session?.user ?? null;
-  const verified = isEmailVerified(user);
 
   const loadPrompt = useCallback(async () => {
     if (!supabase) {
@@ -74,15 +71,23 @@ export function PromptDetail({ promptId }: { promptId: string }) {
     }
 
     const row = data as unknown as PromptDetailRow;
-    const [{ data: likeRows }, { data: viewerLikeRows }] = await Promise.all([
-      supabase.from("prompt_likes").select("prompt_id").eq("prompt_id", row.id),
-      user
+    const viewerLikeQuery = user
+      ? supabase
+          .from("prompt_likes")
+          .select("prompt_id")
+          .eq("prompt_id", row.id)
+          .eq("user_id", user.id)
+      : anonymousLikeId
         ? supabase
             .from("prompt_likes")
             .select("prompt_id")
             .eq("prompt_id", row.id)
-            .eq("user_id", user.id)
-        : Promise.resolve({ data: [] }),
+            .eq("anon_id", anonymousLikeId)
+        : Promise.resolve({ data: [] });
+
+    const [{ data: likeRows }, { data: viewerLikeRows }] = await Promise.all([
+      supabase.from("prompt_likes").select("prompt_id").eq("prompt_id", row.id),
+      viewerLikeQuery,
     ]);
 
     setPrompt({
@@ -98,7 +103,7 @@ export function PromptDetail({ promptId }: { promptId: string }) {
       viewerLiked: Boolean(viewerLikeRows?.length),
     });
     setIsLoading(false);
-  }, [promptId, supabase, user]);
+  }, [anonymousLikeId, promptId, supabase, user]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -115,6 +120,14 @@ export function PromptDetail({ promptId }: { promptId: string }) {
 
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAnonymousLikeId(getAnonymousLikeId());
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -146,32 +159,31 @@ export function PromptDetail({ promptId }: { promptId: string }) {
   const handleLike = async () => {
     if (!supabase || !prompt) return;
 
-    if (!user) {
-      toast.error("로그인 후 좋아요를 누를 수 있습니다.");
-      return;
-    }
-
-    if (!verified) {
-      toast.error("이메일 인증 후 좋아요를 누를 수 있습니다.");
-      return;
-    }
-
     const nextLiked = !prompt.viewerLiked;
+    const visitorId = anonymousLikeId ?? getAnonymousLikeId();
+    if (!anonymousLikeId) setAnonymousLikeId(visitorId);
+
     setPrompt({
       ...prompt,
       viewerLiked: nextLiked,
       likesCount: prompt.likesCount + (nextLiked ? 1 : -1),
     });
 
-    const result = nextLiked
-      ? await supabase
-          .from("prompt_likes")
-          .insert({ prompt_id: prompt.id, user_id: user.id })
-      : await supabase
-          .from("prompt_likes")
-          .delete()
-          .eq("prompt_id", prompt.id)
-          .eq("user_id", user.id);
+    const result = user
+      ? nextLiked
+        ? await supabase
+            .from("prompt_likes")
+            .insert({ prompt_id: prompt.id, user_id: user.id })
+        : await supabase
+            .from("prompt_likes")
+            .delete()
+            .eq("prompt_id", prompt.id)
+            .eq("user_id", user.id)
+      : await supabase.rpc("toggle_anonymous_prompt_like", {
+          target_prompt_id: prompt.id,
+          visitor_id: visitorId,
+          should_like: nextLiked,
+        });
 
     if (result.error) {
       toast.error(result.error.message);
