@@ -51,6 +51,7 @@ interface CommunityPrompt {
 }
 
 type AuthMode = "signin" | "signup";
+type SortMode = "latest" | "likes" | "copies";
 
 type PromptResult = PromptRow & {
   profiles: { username: string } | null;
@@ -78,6 +79,7 @@ export function PromptCommunity() {
   const [isAuthBusy, setIsAuthBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<"user" | "admin" | null>(
     null
@@ -102,8 +104,7 @@ export function PromptCommunity() {
         "id, author_id, title, description, body, category, tags, status, view_count, copy_count, created_at, updated_at, profiles!prompts_author_id_fkey(username)"
       )
       .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .limit(80);
+      .order("created_at", { ascending: false });
 
     if (error) {
       toast.error(error.message);
@@ -235,19 +236,35 @@ export function PromptCommunity() {
   const visiblePrompts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return prompts.filter((prompt) => {
-      const matchesCategory =
-        categoryFilter === "all" || prompt.category === categoryFilter;
-      const matchesQuery =
-        query.length === 0 ||
-        [prompt.title, prompt.description, prompt.body, ...prompt.tags]
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
+    return [...prompts]
+      .filter((prompt) => {
+        const matchesCategory =
+          categoryFilter === "all" || prompt.category === categoryFilter;
+        const matchesQuery =
+          query.length === 0 ||
+          [prompt.title, prompt.description, prompt.body, ...prompt.tags]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
 
-      return matchesCategory && matchesQuery;
-    });
-  }, [categoryFilter, prompts, searchQuery]);
+        return matchesCategory && matchesQuery;
+      })
+      .sort((left, right) => {
+        const latestDiff =
+          new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime();
+
+        if (sortMode === "likes") {
+          return right.likesCount - left.likesCount || latestDiff;
+        }
+
+        if (sortMode === "copies") {
+          return right.copyCount - left.copyCount || latestDiff;
+        }
+
+        return latestDiff;
+      });
+  }, [categoryFilter, prompts, searchQuery, sortMode]);
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -400,6 +417,16 @@ export function PromptCommunity() {
                 {category.label}
               </option>
             ))}
+          </select>
+          <select
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as SortMode)}
+            aria-label="프롬프트 정렬"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="latest">최신순</option>
+            <option value="likes">좋아요 순</option>
+            <option value="copies">복사된 순</option>
           </select>
         </div>
 
