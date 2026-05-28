@@ -15,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 const tools = [
@@ -39,8 +38,6 @@ const tools = [
     description:
       "JPG, PNG, WebP, AVIF, HEIC 간 변환과 리사이징, 회전을 지원합니다.",
     icon: ImageIcon,
-    badge: "주요 기능",
-    badgeVariant: "default" as const,
   },
   {
     href: "/convert/pdf",
@@ -78,9 +75,6 @@ export default function Home() {
     <div className="mx-auto max-w-6xl px-4">
       {/* Hero */}
       <section className="py-16 md:py-24 text-center">
-        <Badge variant="outline" className="mb-4">
-          브라우저에서 바로 쓰는 보고서 도구
-        </Badge>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
           글자수 검사와 파일 작업을
           <br />
@@ -120,9 +114,6 @@ export default function Home() {
                       <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
                         <Icon className="h-5 w-5" />
                       </div>
-                      {tool.badge && (
-                        <Badge variant={tool.badgeVariant}>{tool.badge}</Badge>
-                      )}
                     </div>
                     <CardTitle className="mt-3 flex items-center justify-between text-base">
                       <span>{tool.title}</span>
