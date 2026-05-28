@@ -141,11 +141,12 @@ on public.profiles for select
 using (true);
 
 drop policy if exists "Users can update own profile" on public.profiles;
-create policy "Users can update own profile"
+drop policy if exists "Users can update own non-admin profile" on public.profiles;
+create policy "Users can update own non-admin profile"
 on public.profiles for update
 to authenticated
-using (auth.uid() = id)
-with check (auth.uid() = id);
+using (auth.uid() = id and role = 'user')
+with check (auth.uid() = id and role = 'user');
 
 drop policy if exists "Published prompts are readable" on public.prompts;
 create policy "Published prompts are readable"
