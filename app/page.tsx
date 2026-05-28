@@ -8,6 +8,8 @@ import {
   Zap,
   ShieldCheck,
   Calculator,
+  Eraser,
+  CalendarDays,
 } from "lucide-react";
 import {
   Card,
@@ -24,6 +26,20 @@ const tools = [
     description:
       "공백 포함·미포함 글자수, 단어수, 나이스 기준 바이트 수를 한 번에 확인합니다.",
     icon: FileText,
+  },
+  {
+    href: "/plain-text",
+    title: "서식 지우기",
+    description:
+      "웹에서 복사한 글의 배경색, 링크, 폰트 서식을 제거하고 순수 텍스트로 정리합니다.",
+    icon: Eraser,
+  },
+  {
+    href: "/date-calculator",
+    title: "날짜 계산기",
+    description:
+      "+30일, 다음 주 금요일, 월말 날짜와 ISO 주차를 바로 계산하고 복사합니다.",
+    icon: CalendarDays,
   },
   {
     href: "/math",
@@ -103,7 +119,7 @@ export default function Home() {
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
           제공 도구
         </h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {tools.map((tool) => {
             const Icon = tool.icon;
             return (

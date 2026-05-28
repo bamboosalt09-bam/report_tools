@@ -3,6 +3,8 @@ import { FileStack } from "lucide-react";
 
 const navItems = [
   { href: "/text-counter", label: "글자수" },
+  { href: "/plain-text", label: "서식" },
+  { href: "/date-calculator", label: "날짜" },
   { href: "/math", label: "수식" },
   { href: "/convert/image", label: "이미지" },
   { href: "/convert/pdf", label: "PDF" },
