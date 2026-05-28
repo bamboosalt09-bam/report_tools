@@ -2,10 +2,11 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
 const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
-const rawSupabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
-  "";
+const publishableKey = (
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? ""
+).trim();
+const legacyAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
+const rawSupabaseKey = publishableKey || legacyAnonKey;
 
 const placeholderKeys = new Set([
   "supabase anon public key",
