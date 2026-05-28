@@ -13,6 +13,33 @@ export function AuthCallback() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [message, setMessage] = useState("이메일 인증을 확인하는 중입니다.");
 
+  const redirectPath = useMemo(() => {
+    const next = searchParams.get("next");
+    if (
+      !next ||
+      !next.startsWith("/") ||
+      next.startsWith("//") ||
+      next.includes("\\")
+    ) {
+      return "/prompts";
+    }
+
+    try {
+      const fallbackOrigin = "https://report-tools.local";
+      const parsed = new URL(next, fallbackOrigin);
+      if (
+        parsed.origin !== fallbackOrigin ||
+        parsed.pathname === "/auth/callback"
+      ) {
+        return "/prompts";
+      }
+
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return "/prompts";
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (!supabase) return;
 
@@ -28,12 +55,12 @@ export function AuthCallback() {
         }
       }
 
-      setMessage("인증이 완료되었습니다. 프롬프트 페이지로 이동합니다.");
-      router.replace("/prompts");
+      setMessage("인증이 완료되었습니다. 원래 화면으로 이동합니다.");
+      router.replace(redirectPath);
     }
 
     void completeAuth();
-  }, [router, searchParams, supabase]);
+  }, [redirectPath, router, searchParams, supabase]);
 
   if (!supabase) {
     return <SupabaseSetupNotice />;

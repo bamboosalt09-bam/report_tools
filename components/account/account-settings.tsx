@@ -142,7 +142,9 @@ export function AccountSettings() {
     setIsEmailBusy(true);
     const { error } = await supabase.auth.updateUser(
       { email: nextEmail },
-      { emailRedirectTo: `${window.location.origin}/auth/callback` }
+      {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
+      }
     );
     setIsEmailBusy(false);
 

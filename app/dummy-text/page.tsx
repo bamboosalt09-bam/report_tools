@@ -1,5 +1,4 @@
-import { PageHeader } from "@/components/page-header";
-import { KoreanDummyTextGenerator } from "@/components/tools/korean-dummy-text-generator";
+import { redirect } from "next/navigation";
 
 export const metadata = {
   title: "한글 더미 텍스트",
@@ -8,15 +7,5 @@ export const metadata = {
 };
 
 export default function DummyTextPage() {
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
-      <PageHeader
-        title="한글 더미 텍스트"
-        description="보고서나 공문 양식을 맞추고 분량을 확인할 때 쓸 수 있는 중립 문장과 어구를 추천합니다."
-      />
-      <div className="mt-8">
-        <KoreanDummyTextGenerator />
-      </div>
-    </div>
-  );
+  redirect("/writing-tools");
 }

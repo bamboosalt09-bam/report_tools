@@ -29,6 +29,41 @@ const tools = [
     icon: FileText,
   },
   {
+    href: "/prompts",
+    title: "프롬프트 커뮤니티",
+    description:
+      "사용자가 직접 만든 AI 프롬프트를 공유하고 복사해서 사용할 수 있습니다.",
+    icon: Sparkles,
+  },
+  {
+    href: "/convert/pdf",
+    title: "PDF 도구",
+    description:
+      "PDF 병합·분할·회전·압축, 이미지에서 PDF 생성. 페이지별 분할도 가능합니다.",
+    icon: FileType,
+  },
+  {
+    href: "/convert/image",
+    title: "이미지 변환",
+    description:
+      "JPG, PNG, WebP, AVIF, HEIC 간 변환과 리사이징, 회전을 지원합니다.",
+    icon: ImageIcon,
+  },
+  {
+    href: "/writing-tools",
+    title: "문서 보조",
+    description:
+      "한영 오타 변환과 한글 더미 텍스트 생성을 한 곳에서 처리합니다.",
+    icon: Keyboard,
+  },
+  {
+    href: "/math",
+    title: "수식 변환",
+    description:
+      "LaTeX 수식과 한글 수식편집기 문법을 서로 변환하고 바로 복사합니다.",
+    icon: Calculator,
+  },
+  {
     href: "/plain-text",
     title: "서식 지우기",
     description:
@@ -41,48 +76,6 @@ const tools = [
     description:
       "+30일, 이번 주 금요일, 월말 날짜와 ISO 주차를 바로 계산하고 복사합니다.",
     icon: CalendarDays,
-  },
-  {
-    href: "/math",
-    title: "수식 변환",
-    description:
-      "LaTeX 수식과 한글 수식편집기 문법을 서로 변환하고 바로 복사합니다.",
-    icon: Calculator,
-  },
-  {
-    href: "/keyboard-converter",
-    title: "한영 오타 변환",
-    description:
-      "한글과 영어 입력 상태를 잘못 둔 채 작성한 문장을 바로 되돌리고 복사합니다.",
-    icon: Keyboard,
-  },
-  {
-    href: "/dummy-text",
-    title: "한글 더미 텍스트",
-    description:
-      "보고서, 공문, 기획서 양식 점검에 쓰기 좋은 중립 문장과 어구를 추천합니다.",
-    icon: FileText,
-  },
-  {
-    href: "/convert/image",
-    title: "이미지 변환",
-    description:
-      "JPG, PNG, WebP, AVIF, HEIC 간 변환과 리사이징, 회전을 지원합니다.",
-    icon: ImageIcon,
-  },
-  {
-    href: "/convert/pdf",
-    title: "PDF 도구",
-    description:
-      "PDF 병합·분할·회전·압축, 이미지에서 PDF 생성. 페이지별 분할도 가능합니다.",
-    icon: FileType,
-  },
-  {
-    href: "/prompts",
-    title: "프롬프트 커뮤니티",
-    description:
-      "사용자가 직접 만든 AI 프롬프트를 공유하고 복사해서 사용할 수 있습니다.",
-    icon: Sparkles,
   },
 ];
 

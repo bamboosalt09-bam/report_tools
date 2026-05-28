@@ -3,14 +3,13 @@ import { FileStack } from "lucide-react";
 
 const navItems = [
   { href: "/text-counter", label: "글자수" },
+  { href: "/prompts", label: "프롬프트" },
+  { href: "/convert/pdf", label: "PDF" },
+  { href: "/convert/image", label: "이미지" },
+  { href: "/writing-tools", label: "문서 보조" },
+  { href: "/math", label: "수식" },
   { href: "/plain-text", label: "서식" },
   { href: "/date-calculator", label: "날짜" },
-  { href: "/math", label: "수식" },
-  { href: "/keyboard-converter", label: "오타" },
-  { href: "/dummy-text", label: "더미" },
-  { href: "/convert/image", label: "이미지" },
-  { href: "/convert/pdf", label: "PDF" },
-  { href: "/prompts", label: "프롬프트" },
   { href: "/account", label: "계정" },
 ];
 

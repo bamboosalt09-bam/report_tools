@@ -318,11 +318,12 @@ export function PromptCommunity() {
 
     if (authMode === "signup") {
       const username = authUsername.trim() || authEmail.split("@")[0] || "사용자";
+      const nextPath = `${window.location.pathname}${window.location.search}`;
       const { error } = await supabase.auth.signUp({
         email: authEmail.trim(),
         password: authPassword,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           data: { username },
         },
       });
