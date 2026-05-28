@@ -10,6 +10,7 @@ import {
   RotateCw,
   FilePlus,
   Info,
+  Archive,
 } from "lucide-react";
 import { toast } from "sonner";
 import { saveAs } from "file-saver";
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
 import {
   Tabs,
   TabsContent,
@@ -41,7 +43,19 @@ import {
   rotatePdf,
   imagesToPdf,
   getPdfPageCount,
+  compressPdf,
 } from "@/lib/converters/pdf";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(Math.round(value), min), max);
+}
 
 // 병합 탭
 function MergeTab() {
@@ -398,11 +412,183 @@ function ImagesToPdfTab() {
   );
 }
 
+function CompressTab() {
+  const [files, setFiles] = useState<File[]>([]);
+  const [dpi, setDpi] = useState(120);
+  const [quality, setQuality] = useState(72);
+  const [working, setWorking] = useState(false);
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+  const [result, setResult] = useState<{
+    before: number;
+    after: number;
+  } | null>(null);
+
+  const handleFilesChange = (newFiles: File[]) => {
+    setFiles(newFiles);
+    setProgress(null);
+    setResult(null);
+  };
+
+  const handleCompress = async () => {
+    if (!files[0]) {
+      toast.error("압축할 PDF 파일을 선택하세요");
+      return;
+    }
+
+    setWorking(true);
+    setProgress(null);
+    setResult(null);
+
+    try {
+      const blob = await compressPdf(files[0], {
+        dpi,
+        imageQuality: quality,
+        onProgress: setProgress,
+      });
+      const outputName = `compressed-${files[0].name.replace(/\.pdf$/i, "")}.pdf`;
+
+      saveAs(blob, outputName);
+      setResult({ before: files[0].size, after: blob.size });
+
+      const savedRatio =
+        files[0].size > 0
+          ? Math.max(0, 100 - (blob.size / files[0].size) * 100)
+          : 0;
+      toast.success(`PDF 압축 완료 · 약 ${savedRatio.toFixed(1)}% 절감`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "압축 실패");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <FileDropzone
+        accept="application/pdf,.pdf"
+        multiple={false}
+        files={files}
+        onFilesChange={handleFilesChange}
+        label="압축할 PDF 파일을 업로드하세요"
+        hint="페이지를 이미지로 다시 구성해 용량을 줄입니다"
+      />
+
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="space-y-3 rounded-md border p-4">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="compress-dpi">DPI</Label>
+            <Input
+              id="compress-dpi"
+              inputMode="numeric"
+              value={dpi}
+              onChange={(event) =>
+                setDpi(clampNumber(Number(event.target.value), 72, 300))
+              }
+              className="h-8 w-20 text-right"
+            />
+          </div>
+          <Slider
+            value={[dpi]}
+            min={72}
+            max={300}
+            step={1}
+            onValueChange={(value) => setDpi(value[0] ?? dpi)}
+          />
+          <p className="text-xs text-muted-foreground">
+            낮을수록 용량이 줄고, 높을수록 작은 글씨와 표가 더 선명합니다.
+          </p>
+        </div>
+
+        <div className="space-y-3 rounded-md border p-4">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="compress-quality">이미지 품질</Label>
+            <Input
+              id="compress-quality"
+              inputMode="numeric"
+              value={quality}
+              onChange={(event) =>
+                setQuality(clampNumber(Number(event.target.value), 10, 100))
+              }
+              className="h-8 w-20 text-right"
+            />
+          </div>
+          <Slider
+            value={[quality]}
+            min={10}
+            max={100}
+            step={1}
+            onValueChange={(value) => setQuality(value[0] ?? quality)}
+          />
+          <p className="text-xs text-muted-foreground">
+            낮을수록 더 작아지고, 높을수록 이미지와 글자 가장자리가 덜 깨집니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-md border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+        압축 결과는 페이지를 이미지화한 PDF입니다. 용량은 줄어들 수 있지만
+        텍스트 선택, 검색, 벡터 도형의 확대 선명도는 원본보다 떨어질 수 있습니다.
+      </div>
+
+      {progress && (
+        <p className="text-sm text-muted-foreground">
+          {progress.total}페이지 중{" "}
+          <span className="font-medium text-foreground">{progress.current}</span>
+          페이지 처리 완료
+        </p>
+      )}
+
+      {result && (
+        <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-3">
+          <p>
+            원본{" "}
+            <span className="font-semibold">{formatBytes(result.before)}</span>
+          </p>
+          <p>
+            압축 후{" "}
+            <span className="font-semibold">{formatBytes(result.after)}</span>
+          </p>
+          <p>
+            절감률{" "}
+            <span className="font-semibold">
+              {Math.max(0, 100 - (result.after / result.before) * 100).toFixed(1)}
+              %
+            </span>
+          </p>
+        </div>
+      )}
+
+      <Button
+        onClick={handleCompress}
+        disabled={working || files.length === 0}
+        className="w-full"
+        size="lg"
+      >
+        {working ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            압축 중...
+          </>
+        ) : (
+          <>
+            <Archive className="mr-2 h-4 w-4" />
+            PDF 압축하기
+            <FileDown className="ml-2 h-4 w-4" />
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
 export function PdfTools() {
   return (
     <div className="space-y-4">
       <Tabs defaultValue="merge" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="merge">
             <Combine className="mr-1.5 h-4 w-4 hidden sm:inline" />
             병합
@@ -415,9 +601,13 @@ export function PdfTools() {
             <RotateCw className="mr-1.5 h-4 w-4 hidden sm:inline" />
             회전
           </TabsTrigger>
+          <TabsTrigger value="compress">
+            <Archive className="mr-1.5 h-4 w-4 hidden sm:inline" />
+            압축
+          </TabsTrigger>
           <TabsTrigger value="images">
             <FilePlus className="mr-1.5 h-4 w-4 hidden sm:inline" />
-            이미지→PDF
+            이미지
           </TabsTrigger>
         </TabsList>
 
@@ -431,6 +621,9 @@ export function PdfTools() {
             </TabsContent>
             <TabsContent value="rotate" className="mt-0">
               <RotateTab />
+            </TabsContent>
+            <TabsContent value="compress" className="mt-0">
+              <CompressTab />
             </TabsContent>
             <TabsContent value="images" className="mt-0">
               <ImagesToPdfTab />

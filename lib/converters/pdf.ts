@@ -1,5 +1,24 @@
 import { PDFDocument, PageSizes, degrees } from "pdf-lib";
 
+type PdfJsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+
+let pdfJsPromise: Promise<PdfJsModule> | null = null;
+
+async function getPdfJs(): Promise<PdfJsModule> {
+  if (!pdfJsPromise) {
+    pdfJsPromise = import("pdfjs-dist/legacy/build/pdf.mjs").then((pdfjs) => {
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/legacy/build/pdf.worker.mjs",
+        import.meta.url
+      ).toString();
+
+      return pdfjs;
+    });
+  }
+
+  return pdfJsPromise;
+}
+
 export async function mergePdfs(files: File[]): Promise<Blob> {
   if (files.length === 0) throw new Error("병합할 PDF 파일이 없습니다");
   const merged = await PDFDocument.create();
@@ -121,6 +140,99 @@ export async function getPdfPageCount(file: File): Promise<number> {
   const bytes = await file.arrayBuffer();
   const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   return doc.getPageCount();
+}
+
+export interface CompressPdfOptions {
+  dpi: number;
+  imageQuality: number;
+  onProgress?: (progress: { current: number; total: number }) => void;
+}
+
+async function canvasToJpegBytes(
+  canvas: HTMLCanvasElement,
+  quality: number
+): Promise<ArrayBuffer> {
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) =>
+        result ? resolve(result) : reject(new Error("JPEG 압축에 실패했습니다")),
+      "image/jpeg",
+      quality
+    );
+  });
+
+  return blob.arrayBuffer();
+}
+
+export async function compressPdf(
+  file: File,
+  options: CompressPdfOptions
+): Promise<Blob> {
+  const dpi = Math.min(Math.max(options.dpi, 72), 300);
+  const imageQuality = Math.min(Math.max(options.imageQuality, 10), 100) / 100;
+  const pdfjs = await getPdfJs();
+  const data = new Uint8Array(await file.arrayBuffer());
+  const loadingTask = pdfjs.getDocument({ data });
+  const source = await loadingTask.promise;
+  const output = await PDFDocument.create();
+  const maxCanvasSide = 8000;
+
+  try {
+    for (let pageNumber = 1; pageNumber <= source.numPages; pageNumber++) {
+      const page = await source.getPage(pageNumber);
+      const baseViewport = page.getViewport({ scale: 1 });
+      let scale = dpi / 72;
+      const longestSide =
+        Math.max(baseViewport.width, baseViewport.height) * scale;
+
+      if (longestSide > maxCanvasSide) {
+        scale *= maxCanvasSide / longestSide;
+      }
+
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(viewport.width));
+      canvas.height = Math.max(1, Math.round(viewport.height));
+
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) {
+        throw new Error("Canvas 컨텍스트를 가져올 수 없습니다");
+      }
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      await page.render({
+        canvas,
+        canvasContext: context,
+        viewport,
+      }).promise;
+
+      const jpegBytes = await canvasToJpegBytes(canvas, imageQuality);
+      const image = await output.embedJpg(jpegBytes);
+      const outputPage = output.addPage([
+        baseViewport.width,
+        baseViewport.height,
+      ]);
+
+      outputPage.drawImage(image, {
+        x: 0,
+        y: 0,
+        width: baseViewport.width,
+        height: baseViewport.height,
+      });
+
+      canvas.width = 1;
+      canvas.height = 1;
+      page.cleanup();
+      options.onProgress?.({ current: pageNumber, total: source.numPages });
+    }
+
+    const bytes = await output.save();
+    return new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+  } finally {
+    await source.destroy();
+  }
 }
 
 export interface ImagesToPdfOptions {

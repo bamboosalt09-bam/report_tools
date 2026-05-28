@@ -74,7 +74,7 @@ const tools = [
     href: "/convert/pdf",
     title: "PDF 도구",
     description:
-      "PDF 병합·분할·회전, 이미지에서 PDF 생성. 페이지별 분할도 가능합니다.",
+      "PDF 병합·분할·회전·압축, 이미지에서 PDF 생성. 페이지별 분할도 가능합니다.",
     icon: FileType,
   },
   {
