@@ -1,4 +1,16 @@
-import { PDFDocument, PageSizes, degrees } from "pdf-lib";
+import {
+  PDFArray,
+  PDFBool,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFNumber,
+  PDFRawStream,
+  PDFRef,
+  PDFStream,
+  PageSizes,
+  degrees,
+} from "pdf-lib";
 
 type PdfJsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
 
@@ -148,6 +160,20 @@ export interface CompressPdfOptions {
   onProgress?: (progress: { current: number; total: number }) => void;
 }
 
+export interface PreserveTextCompressionStats {
+  totalImages: number;
+  recompressedImages: number;
+  skippedImages: number;
+  beforeImageBytes: number;
+  afterImageBytes: number;
+  keptOriginalFile: boolean;
+}
+
+export interface CompressPdfResult {
+  blob: Blob;
+  stats: PreserveTextCompressionStats;
+}
+
 async function canvasToJpegBytes(
   canvas: HTMLCanvasElement,
   quality: number
@@ -164,7 +190,240 @@ async function canvasToJpegBytes(
   return blob.arrayBuffer();
 }
 
-export async function compressPdf(
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength
+  ) as ArrayBuffer;
+}
+
+function getPdfNameValue(value: unknown): string | null {
+  return value instanceof PDFName ? value.decodeText() : null;
+}
+
+function getFilterNames(stream: PDFStream): string[] {
+  const filter = stream.dict.lookup(PDFName.of("Filter"));
+
+  if (filter instanceof PDFName) {
+    return [filter.decodeText()];
+  }
+
+  if (filter instanceof PDFArray) {
+    const names: string[] = [];
+    for (let index = 0; index < filter.size(); index++) {
+      const item = filter.lookup(index);
+      const name = getPdfNameValue(item);
+      if (name) names.push(name);
+    }
+    return names;
+  }
+
+  return [];
+}
+
+function isDirectJpegImage(stream: PDFRawStream): boolean {
+  const subtype = getPdfNameValue(stream.dict.lookup(PDFName.of("Subtype")));
+  if (subtype !== "Image") return false;
+
+  const filters = getFilterNames(stream);
+  if (filters.length !== 1 || filters[0] !== "DCTDecode") return false;
+
+  const imageMask = stream.dict.lookupMaybe(PDFName.of("ImageMask"), PDFBool);
+  if (imageMask?.asBoolean()) return false;
+
+  if (stream.dict.has(PDFName.of("SMask"))) return false;
+  if (stream.dict.has(PDFName.of("Mask"))) return false;
+
+  return true;
+}
+
+interface ImageCandidate {
+  ref?: PDFRef;
+  key?: PDFName;
+  xObjects?: PDFDict;
+  stream: PDFRawStream;
+}
+
+function collectImageCandidates(doc: PDFDocument): ImageCandidate[] {
+  const candidates: ImageCandidate[] = [];
+  const visitedRefs = new Set<string>();
+  const visitedStreams = new Set<PDFRawStream>();
+
+  const visitResources = (resources: PDFDict | undefined) => {
+    if (!resources) return;
+
+    const xObjects = resources.lookupMaybe(PDFName.of("XObject"), PDFDict);
+    if (!xObjects) return;
+
+    for (const [name, value] of xObjects.entries()) {
+      const ref = value instanceof PDFRef ? value : undefined;
+      if (ref) {
+        const key = ref.toString();
+        if (visitedRefs.has(key)) continue;
+        visitedRefs.add(key);
+      }
+
+      const resolved = ref ? doc.context.lookup(ref) : value;
+      if (!(resolved instanceof PDFRawStream)) continue;
+
+      if (visitedStreams.has(resolved)) continue;
+      visitedStreams.add(resolved);
+
+      if (isDirectJpegImage(resolved)) {
+        candidates.push({
+          ref,
+          key: value instanceof PDFRef ? undefined : name,
+          xObjects: value instanceof PDFRef ? undefined : xObjects,
+          stream: resolved,
+        });
+        continue;
+      }
+
+      const subtype = getPdfNameValue(resolved.dict.lookup(PDFName.of("Subtype")));
+      if (subtype === "Form") {
+        visitResources(resolved.dict.lookupMaybe(PDFName.of("Resources"), PDFDict));
+      }
+    }
+  };
+
+  for (const page of doc.getPages()) {
+    visitResources(page.node.Resources());
+  }
+
+  return candidates;
+}
+
+async function jpegBytesToCanvas(
+  bytes: Uint8Array,
+  targetScale: number
+): Promise<HTMLCanvasElement> {
+  const blob = new Blob([bytesToArrayBuffer(bytes)], { type: "image/jpeg" });
+  const url = URL.createObjectURL(blob);
+
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("PDF 내부 이미지를 읽을 수 없습니다"));
+      image.src = url;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * targetScale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * targetScale));
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("Canvas 컨텍스트를 가져올 수 없습니다");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function replaceImageStream(
+  doc: PDFDocument,
+  candidate: ImageCandidate,
+  jpegBytes: Uint8Array,
+  width: number,
+  height: number
+) {
+  const dict = candidate.stream.dict.clone(doc.context);
+
+  dict.set(PDFName.of("Filter"), PDFName.of("DCTDecode"));
+  dict.set(PDFName.of("ColorSpace"), PDFName.of("DeviceRGB"));
+  dict.set(PDFName.of("BitsPerComponent"), PDFNumber.of(8));
+  dict.set(PDFName.of("Width"), PDFNumber.of(width));
+  dict.set(PDFName.of("Height"), PDFNumber.of(height));
+  dict.delete(PDFName.of("Decode"));
+  dict.delete(PDFName.of("DecodeParms"));
+  dict.delete(PDFName.of("DP"));
+
+  const replacement = PDFRawStream.of(dict, jpegBytes);
+
+  if (candidate.ref) {
+    doc.context.assign(candidate.ref, replacement);
+  } else if (candidate.key && candidate.xObjects) {
+    candidate.xObjects.set(candidate.key, replacement);
+  }
+}
+
+export async function compressPdfPreservingText(
+  file: File,
+  options: CompressPdfOptions
+): Promise<CompressPdfResult> {
+  const sourceBytes = new Uint8Array(await file.arrayBuffer());
+  const doc = await PDFDocument.load(sourceBytes, { ignoreEncryption: true });
+  const quality = Math.min(Math.max(options.imageQuality, 10), 100) / 100;
+  const dpi = Math.min(Math.max(options.dpi, 72), 300);
+  const targetScale = Math.min(1, dpi / 300);
+  const candidates = collectImageCandidates(doc);
+  const stats: PreserveTextCompressionStats = {
+    totalImages: candidates.length,
+    recompressedImages: 0,
+    skippedImages: 0,
+    beforeImageBytes: 0,
+    afterImageBytes: 0,
+    keptOriginalFile: false,
+  };
+
+  for (let index = 0; index < candidates.length; index++) {
+    const candidate = candidates[index];
+    const originalBytes = candidate.stream.getContents();
+    stats.beforeImageBytes += originalBytes.length;
+
+    try {
+      const canvas = await jpegBytesToCanvas(originalBytes, targetScale);
+      const compressed = new Uint8Array(
+        await canvasToJpegBytes(canvas, quality)
+      );
+
+      if (compressed.length < originalBytes.length) {
+        replaceImageStream(
+          doc,
+          candidate,
+          compressed,
+          canvas.width,
+          canvas.height
+        );
+        stats.recompressedImages += 1;
+        stats.afterImageBytes += compressed.length;
+      } else {
+        stats.skippedImages += 1;
+        stats.afterImageBytes += originalBytes.length;
+      }
+
+      canvas.width = 1;
+      canvas.height = 1;
+    } catch {
+      stats.skippedImages += 1;
+      stats.afterImageBytes += originalBytes.length;
+    }
+
+    options.onProgress?.({ current: index + 1, total: candidates.length });
+  }
+
+  const outputBytes = new Uint8Array(await doc.save({ useObjectStreams: true }));
+
+  if (outputBytes.length >= sourceBytes.length) {
+    stats.keptOriginalFile = true;
+    return {
+      blob: new Blob([bytesToArrayBuffer(sourceBytes)], { type: "application/pdf" }),
+      stats,
+    };
+  }
+
+  return {
+    blob: new Blob([bytesToArrayBuffer(outputBytes)], { type: "application/pdf" }),
+    stats,
+  };
+}
+
+export async function compressPdfAsImages(
   file: File,
   options: CompressPdfOptions
 ): Promise<Blob> {

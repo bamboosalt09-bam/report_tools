@@ -43,8 +43,12 @@ import {
   rotatePdf,
   imagesToPdf,
   getPdfPageCount,
-  compressPdf,
+  compressPdfAsImages,
+  compressPdfPreservingText,
+  type PreserveTextCompressionStats,
 } from "@/lib/converters/pdf";
+
+type CompressionMode = "preserveText" | "rasterize";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -414,6 +418,7 @@ function ImagesToPdfTab() {
 
 function CompressTab() {
   const [files, setFiles] = useState<File[]>([]);
+  const [mode, setMode] = useState<CompressionMode>("preserveText");
   const [dpi, setDpi] = useState(120);
   const [quality, setQuality] = useState(72);
   const [working, setWorking] = useState(false);
@@ -424,6 +429,8 @@ function CompressTab() {
   const [result, setResult] = useState<{
     before: number;
     after: number;
+    mode: CompressionMode;
+    stats?: PreserveTextCompressionStats;
   } | null>(null);
 
   const handleFilesChange = (newFiles: File[]) => {
@@ -443,21 +450,38 @@ function CompressTab() {
     setResult(null);
 
     try {
-      const blob = await compressPdf(files[0], {
-        dpi,
-        imageQuality: quality,
-        onProgress: setProgress,
-      });
+      const compression =
+        mode === "preserveText"
+          ? await compressPdfPreservingText(files[0], {
+              dpi,
+              imageQuality: quality,
+              onProgress: setProgress,
+            })
+          : {
+              blob: await compressPdfAsImages(files[0], {
+                dpi,
+                imageQuality: quality,
+                onProgress: setProgress,
+              }),
+              stats: undefined,
+            };
+
+      const { blob, stats } = compression;
       const outputName = `compressed-${files[0].name.replace(/\.pdf$/i, "")}.pdf`;
 
       saveAs(blob, outputName);
-      setResult({ before: files[0].size, after: blob.size });
+      setResult({ before: files[0].size, after: blob.size, mode, stats });
 
       const savedRatio =
         files[0].size > 0
           ? Math.max(0, 100 - (blob.size / files[0].size) * 100)
           : 0;
-      toast.success(`PDF 압축 완료 · 약 ${savedRatio.toFixed(1)}% 절감`);
+
+      if (stats?.keptOriginalFile) {
+        toast.info("원본보다 작아지지 않아 파일 크기를 유지했습니다.");
+      } else {
+        toast.success(`PDF 압축 완료 · 약 ${savedRatio.toFixed(1)}% 절감`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "압축 실패");
     } finally {
@@ -473,13 +497,38 @@ function CompressTab() {
         files={files}
         onFilesChange={handleFilesChange}
         label="압축할 PDF 파일을 업로드하세요"
-        hint="페이지를 이미지로 다시 구성해 용량을 줄입니다"
+        hint="기본값은 텍스트를 보존하고 이미지만 압축합니다"
       />
+
+      <div className="grid gap-2 rounded-md border p-1 sm:grid-cols-2">
+        <Button
+          type="button"
+          variant={mode === "preserveText" ? "secondary" : "ghost"}
+          onClick={() => {
+            setMode("preserveText");
+            setResult(null);
+            setProgress(null);
+          }}
+        >
+          텍스트 보존
+        </Button>
+        <Button
+          type="button"
+          variant={mode === "rasterize" ? "secondary" : "ghost"}
+          onClick={() => {
+            setMode("rasterize");
+            setResult(null);
+            setProgress(null);
+          }}
+        >
+          전체 이미지화
+        </Button>
+      </div>
 
       <div className="grid gap-5 md:grid-cols-2">
         <div className="space-y-3 rounded-md border p-4">
           <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="compress-dpi">DPI</Label>
+            <Label htmlFor="compress-dpi">이미지 기준 DPI</Label>
             <Input
               id="compress-dpi"
               inputMode="numeric"
@@ -498,7 +547,7 @@ function CompressTab() {
             onValueChange={(value) => setDpi(value[0] ?? dpi)}
           />
           <p className="text-xs text-muted-foreground">
-            낮을수록 용량이 줄고, 높을수록 작은 글씨와 표가 더 선명합니다.
+            텍스트 보존 모드에서는 이미지 픽셀을 300 DPI 기준으로 줄입니다.
           </p>
         </div>
 
@@ -529,35 +578,62 @@ function CompressTab() {
       </div>
 
       <div className="rounded-md border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
-        압축 결과는 페이지를 이미지화한 PDF입니다. 용량은 줄어들 수 있지만
-        텍스트 선택, 검색, 벡터 도형의 확대 선명도는 원본보다 떨어질 수 있습니다.
+        {mode === "preserveText"
+          ? "텍스트 보존 모드는 PDF의 텍스트, 벡터 도형, 링크 구조는 그대로 두고 직접 처리 가능한 JPEG 이미지 리소스만 압축합니다. PNG, 마스크가 있는 이미지, 특수 인코딩 이미지는 건너뜁니다."
+          : "전체 이미지화 모드는 페이지를 통째로 이미지화합니다. 용량은 더 줄어들 수 있지만 텍스트 선택, 검색, 벡터 도형의 확대 선명도는 원본보다 떨어질 수 있습니다."}
       </div>
 
       {progress && (
         <p className="text-sm text-muted-foreground">
-          {progress.total}페이지 중{" "}
+          {progress.total}
+          {mode === "preserveText" ? "개 이미지 중 " : "페이지 중 "}
           <span className="font-medium text-foreground">{progress.current}</span>
-          페이지 처리 완료
+          {mode === "preserveText" ? "개 처리 완료" : "페이지 처리 완료"}
         </p>
       )}
 
       {result && (
-        <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-3">
-          <p>
-            원본{" "}
-            <span className="font-semibold">{formatBytes(result.before)}</span>
-          </p>
-          <p>
-            압축 후{" "}
-            <span className="font-semibold">{formatBytes(result.after)}</span>
-          </p>
-          <p>
-            절감률{" "}
-            <span className="font-semibold">
-              {Math.max(0, 100 - (result.after / result.before) * 100).toFixed(1)}
-              %
-            </span>
-          </p>
+        <div className="space-y-3 rounded-md border p-3 text-sm">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <p>
+              원본{" "}
+              <span className="font-semibold">{formatBytes(result.before)}</span>
+            </p>
+            <p>
+              압축 후{" "}
+              <span className="font-semibold">{formatBytes(result.after)}</span>
+            </p>
+            <p>
+              절감률{" "}
+              <span className="font-semibold">
+                {Math.max(0, 100 - (result.after / result.before) * 100).toFixed(
+                  1
+                )}
+                %
+              </span>
+            </p>
+          </div>
+          {result.stats && (
+            <div className="grid gap-2 border-t pt-3 text-xs text-muted-foreground sm:grid-cols-3">
+              <p>
+                압축 이미지{" "}
+                <span className="font-medium text-foreground">
+                  {result.stats.recompressedImages}/{result.stats.totalImages}
+                </span>
+              </p>
+              <p>건너뜀 {result.stats.skippedImages}</p>
+              <p>
+                이미지 용량{" "}
+                {formatBytes(result.stats.beforeImageBytes)} →{" "}
+                {formatBytes(result.stats.afterImageBytes)}
+              </p>
+              {result.stats.keptOriginalFile && (
+                <p className="sm:col-span-3">
+                  원본보다 결과 파일이 작아지지 않아 원본 파일을 그대로 저장했습니다.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -575,7 +651,7 @@ function CompressTab() {
         ) : (
           <>
             <Archive className="mr-2 h-4 w-4" />
-            PDF 압축하기
+            {mode === "preserveText" ? "텍스트 보존 압축하기" : "PDF 압축하기"}
             <FileDown className="ml-2 h-4 w-4" />
           </>
         )}
