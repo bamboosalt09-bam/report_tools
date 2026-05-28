@@ -18,6 +18,7 @@ export function SupabaseSetupNotice() {
         <p>
           Supabase에서 legacy anon key를 쓰는 경우에는
           <code> NEXT_PUBLIC_SUPABASE_ANON_KEY</code>로 넣어도 됩니다.
+          단, 예시 문구가 들어간 기존 환경변수는 삭제해야 합니다.
         </p>
         <p>
           DB 테이블과 보안 정책은 <code>supabase/schema.sql</code>을 Supabase
