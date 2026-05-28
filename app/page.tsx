@@ -25,8 +25,6 @@ const tools = [
     description:
       "공백 포함·미포함 글자수, 단어수, 나이스 기준 바이트 수를 한 번에 확인합니다.",
     icon: FileText,
-    badge: "신규",
-    badgeVariant: "secondary" as const,
   },
   {
     href: "/math",
@@ -34,8 +32,6 @@ const tools = [
     description:
       "LaTeX 수식과 한글 수식편집기 문법을 서로 변환하고 바로 복사합니다.",
     icon: Calculator,
-    badge: "신규",
-    badgeVariant: "secondary" as const,
   },
   {
     href: "/convert/image",
