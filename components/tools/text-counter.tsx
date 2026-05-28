@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ClipboardCopy, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -88,9 +88,17 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("ko-KR").format(value);
 }
 
+const BYTE_LIMIT_STORAGE_KEY = "report-tools-neis-byte-limit";
+const DEFAULT_BYTE_LIMIT = 1500;
+const byteLimitPresets = [500, 1000, 1500, 2000];
+
+function normalizeLimitInput(value: string): string {
+  return value.replace(/[^\d]/g, "").slice(0, 7);
+}
+
 export function TextCounter() {
   const [text, setText] = useState("");
-  const [limit, setLimit] = useState("1500");
+  const [limit, setLimit] = useState(String(DEFAULT_BYTE_LIMIT));
   const stats = useMemo(() => getTextStats(text), [text]);
 
   const byteLimit = Number.parseInt(limit, 10);
@@ -98,12 +106,35 @@ export function TextCounter() {
   const ratio = hasLimit ? Math.min((stats.neisBytes / byteLimit) * 100, 100) : 0;
   const remaining = hasLimit ? byteLimit - stats.neisBytes : null;
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const savedLimit = window.localStorage.getItem(BYTE_LIMIT_STORAGE_KEY);
+      if (savedLimit) {
+        setLimit(normalizeLimitInput(savedLimit));
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (hasLimit) {
+      window.localStorage.setItem(BYTE_LIMIT_STORAGE_KEY, String(byteLimit));
+    }
+  }, [byteLimit, hasLimit]);
+
   const handleCopySummary = async () => {
     const summary = [
       `공백 포함: ${stats.charsWithSpaces}`,
       `공백 미포함: ${stats.charsWithoutSpaces}`,
       `단어수: ${stats.words}`,
       `나이스 기준 바이트: ${stats.neisBytes}`,
+      hasLimit ? `설정 제한: ${byteLimit} byte` : "설정 제한: 없음",
+      remaining === null
+        ? "제한 상태: 미설정"
+        : remaining < 0
+          ? `제한 상태: ${Math.abs(remaining)} byte 초과`
+          : `제한 상태: ${remaining} byte 남음`,
     ].join("\n");
 
     try {
@@ -127,14 +158,32 @@ export function TextCounter() {
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
-              <Label htmlFor="byte-limit">바이트 제한</Label>
+              <Label htmlFor="byte-limit">나이스 바이트 제한</Label>
               <Input
                 id="byte-limit"
                 inputMode="numeric"
                 value={limit}
-                onChange={(event) => setLimit(event.target.value)}
+                onChange={(event) =>
+                  setLimit(normalizeLimitInput(event.target.value))
+                }
                 className="w-36"
               />
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {byteLimitPresets.map((preset) => (
+                  <Button
+                    key={preset}
+                    type="button"
+                    variant={limit === String(preset) ? "secondary" : "outline"}
+                    size="xs"
+                    onClick={() => setLimit(String(preset))}
+                  >
+                    {formatNumber(preset)}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                제출처 기준에 맞게 제한값을 직접 바꿀 수 있습니다.
+              </p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleCopySummary}>
@@ -159,7 +208,14 @@ export function TextCounter() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">나이스 바이트 제한</CardTitle>
+          <CardTitle className="text-base">
+            나이스 바이트 제한
+            {hasLimit && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {formatNumber(byteLimit)} byte 기준
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="h-2 overflow-hidden rounded-full bg-muted">
