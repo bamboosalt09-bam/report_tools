@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Zap,
   ShieldCheck,
+  Calculator,
 } from "lucide-react";
 import {
   Card,
@@ -24,6 +25,15 @@ const tools = [
     description:
       "공백 포함·미포함 글자수, 단어수, 나이스 기준 바이트 수를 한 번에 확인합니다.",
     icon: FileText,
+    badge: "신규",
+    badgeVariant: "secondary" as const,
+  },
+  {
+    href: "/math",
+    title: "수식 변환",
+    description:
+      "LaTeX 수식과 한글 수식편집기 문법을 서로 변환하고 바로 복사합니다.",
+    icon: Calculator,
     badge: "신규",
     badgeVariant: "secondary" as const,
   },
@@ -103,7 +113,7 @@ export default function Home() {
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
           제공 도구
         </h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           {tools.map((tool) => {
             const Icon = tool.icon;
             return (

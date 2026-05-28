@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   Heart,
+  KeyRound,
   LogOut,
   Plus,
   Search,
@@ -503,6 +504,12 @@ export function PromptCommunity() {
                     <Plus className="mr-2 h-4 w-4" />새 프롬프트 등록
                   </Button>
                 )}
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/account">
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    계정 설정
+                  </Link>
+                </Button>
                 {isAdmin && (
                   <Button asChild variant="outline" className="w-full">
                     <Link href="/admin/prompts">

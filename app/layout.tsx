@@ -18,11 +18,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Report Tools — 글자수·이미지·PDF 도구",
+    default: "Report Tools – 글자수·수식·이미지·PDF 도구",
     template: "%s | Report Tools",
   },
   description:
-    "공백 포함·미포함 글자수, 단어수, 나이스 바이트, 이미지 변환, PDF 작업을 브라우저에서 처리하세요.",
+    "공백 포함·미포함 글자수, 단어수, 나이스 바이트, 수식 변환, 이미지 변환, PDF 작업을 브라우저에서 처리하세요.",
 };
 
 export default function RootLayout({
