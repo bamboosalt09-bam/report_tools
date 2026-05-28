@@ -56,8 +56,8 @@ function mondayOfWeek(date: Date): Date {
   return addDays(date, -offset);
 }
 
-function nextWeekFriday(date: Date): Date {
-  return addDays(mondayOfWeek(date), 11);
+function thisWeekFriday(date: Date): Date {
+  return addDays(mondayOfWeek(date), 4);
 }
 
 function formatDate(date: Date): string {
@@ -90,7 +90,7 @@ function formatIsoWeek(date: Date): string {
 
 function buildResults(baseDate: Date): DateResult[] {
   const plusThirty = addDays(baseDate, 30);
-  const nextFriday = nextWeekFriday(baseDate);
+  const thisFriday = thisWeekFriday(baseDate);
   const monthEnd = endOfMonth(baseDate);
   const weekStart = mondayOfWeek(baseDate);
   const weekEnd = addDays(weekStart, 4);
@@ -111,11 +111,11 @@ function buildResults(baseDate: Date): DateResult[] {
       copyText: formatDateWithWeekday(plusThirty),
     },
     {
-      id: "next-friday",
-      title: "다음 주 금요일",
-      value: formatDateWithWeekday(nextFriday),
-      detail: "기준 주의 다음 주 금요일",
-      copyText: formatDateWithWeekday(nextFriday),
+      id: "this-friday",
+      title: "이번 주 금요일",
+      value: formatDateWithWeekday(thisFriday),
+      detail: "기준 주의 금요일",
+      copyText: formatDateWithWeekday(thisFriday),
     },
     {
       id: "month-end",

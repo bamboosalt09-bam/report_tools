@@ -10,6 +10,7 @@ import {
   Calculator,
   Eraser,
   CalendarDays,
+  Keyboard,
 } from "lucide-react";
 import {
   Card,
@@ -38,7 +39,7 @@ const tools = [
     href: "/date-calculator",
     title: "날짜 계산기",
     description:
-      "+30일, 다음 주 금요일, 월말 날짜와 ISO 주차를 바로 계산하고 복사합니다.",
+      "+30일, 이번 주 금요일, 월말 날짜와 ISO 주차를 바로 계산하고 복사합니다.",
     icon: CalendarDays,
   },
   {
@@ -47,6 +48,20 @@ const tools = [
     description:
       "LaTeX 수식과 한글 수식편집기 문법을 서로 변환하고 바로 복사합니다.",
     icon: Calculator,
+  },
+  {
+    href: "/keyboard-converter",
+    title: "한영 오타 변환",
+    description:
+      "한글과 영어 입력 상태를 잘못 둔 채 작성한 문장을 바로 되돌리고 복사합니다.",
+    icon: Keyboard,
+  },
+  {
+    href: "/dummy-text",
+    title: "한글 더미 텍스트",
+    description:
+      "보고서, 공문, 기획서 양식 점검에 쓰기 좋은 중립 문장과 어구를 추천합니다.",
+    icon: FileText,
   },
   {
     href: "/convert/image",

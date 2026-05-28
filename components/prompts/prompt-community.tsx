@@ -38,11 +38,13 @@ import type { PromptRow } from "@/lib/supabase/types";
 
 interface CommunityPrompt {
   id: string;
+  authorId: string;
   title: string;
   description: string;
   body: string;
   category: string;
   tags: string[];
+  status: PromptRow["status"];
   authorName: string;
   createdAt: string;
   copyCount: number;
@@ -52,10 +54,14 @@ interface CommunityPrompt {
 
 type AuthMode = "signin" | "signup";
 type SortMode = "latest" | "likes" | "copies";
+type ViewMode = "all" | "mine" | "liked";
 
 type PromptResult = PromptRow & {
   profiles: { username: string } | null;
 };
+
+const promptSelect =
+  "id, author_id, title, description, body, category, tags, status, view_count, copy_count, created_at, updated_at, profiles!prompts_author_id_fkey(username)";
 
 function isEmailVerified(user: User | null): boolean {
   return Boolean(user?.email_confirmed_at ?? user?.confirmed_at);
@@ -80,6 +86,7 @@ export function PromptCommunity() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("latest");
+  const [viewMode, setViewMode] = useState<ViewMode>("all");
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<"user" | "admin" | null>(
     null
@@ -98,21 +105,42 @@ export function PromptCommunity() {
 
     setIsLoading(true);
 
-    const { data, error } = await supabase
+    const { data: publishedData, error: publishedError } = await supabase
       .from("prompts")
-      .select(
-        "id, author_id, title, description, body, category, tags, status, view_count, copy_count, created_at, updated_at, profiles!prompts_author_id_fkey(username)"
-      )
+      .select(promptSelect)
       .eq("status", "published")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      toast.error(error.message);
+    if (publishedError) {
+      toast.error(publishedError.message);
       setIsLoading(false);
       return;
     }
 
-    const rows = (data ?? []) as unknown as PromptResult[];
+    const mergedRows = new Map<string, PromptResult>();
+    for (const prompt of (publishedData ?? []) as unknown as PromptResult[]) {
+      mergedRows.set(prompt.id, prompt);
+    }
+
+    if (user) {
+      const { data: ownData, error: ownError } = await supabase
+        .from("prompts")
+        .select(promptSelect)
+        .eq("author_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (ownError) {
+        toast.error(ownError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      for (const prompt of (ownData ?? []) as unknown as PromptResult[]) {
+        mergedRows.set(prompt.id, prompt);
+      }
+    }
+
+    const rows = [...mergedRows.values()];
     const promptIds = rows.map((prompt) => prompt.id);
     const likesByPrompt = new Map<string, number>();
     const viewerLiked = new Set<string>();
@@ -156,11 +184,13 @@ export function PromptCommunity() {
     setPrompts(
       rows.map((prompt) => ({
         id: prompt.id,
+        authorId: prompt.author_id,
         title: prompt.title,
         description: prompt.description,
         body: prompt.body,
         category: prompt.category,
         tags: prompt.tags ?? [],
+        status: prompt.status,
         authorName: prompt.profiles?.username ?? "익명",
         createdAt: prompt.created_at,
         copyCount: prompt.copy_count,
@@ -226,6 +256,16 @@ export function PromptCommunity() {
   }, [supabase, user]);
 
   useEffect(() => {
+    if (user || viewMode === "all") return;
+
+    const timer = window.setTimeout(() => {
+      setViewMode("all");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [user, viewMode]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadPrompts();
     }, 0);
@@ -238,6 +278,10 @@ export function PromptCommunity() {
 
     return [...prompts]
       .filter((prompt) => {
+        const matchesView =
+          viewMode === "all" ||
+          (viewMode === "mine" && user?.id === prompt.authorId) ||
+          (viewMode === "liked" && Boolean(user) && prompt.viewerLiked);
         const matchesCategory =
           categoryFilter === "all" || prompt.category === categoryFilter;
         const matchesQuery =
@@ -247,7 +291,7 @@ export function PromptCommunity() {
             .toLowerCase()
             .includes(query);
 
-        return matchesCategory && matchesQuery;
+        return matchesView && matchesCategory && matchesQuery;
       })
       .sort((left, right) => {
         const latestDiff =
@@ -264,7 +308,7 @@ export function PromptCommunity() {
 
         return latestDiff;
       });
-  }, [categoryFilter, prompts, searchQuery, sortMode]);
+  }, [categoryFilter, prompts, searchQuery, sortMode, user, viewMode]);
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -396,6 +440,35 @@ export function PromptCommunity() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <div className="space-y-5">
+        {user && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "all" ? "secondary" : "outline"}
+              onClick={() => setViewMode("all")}
+            >
+              전체 프롬프트
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "mine" ? "secondary" : "outline"}
+              onClick={() => setViewMode("mine")}
+            >
+              내 프롬프트
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "liked" ? "secondary" : "outline"}
+              onClick={() => setViewMode("liked")}
+            >
+              좋아요한 프롬프트
+            </Button>
+          </div>
+        )}
+
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -448,9 +521,14 @@ export function PromptCommunity() {
               <Card key={prompt.id} className="flex h-full flex-col">
                 <CardHeader>
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <Badge variant="secondary">
-                      {getPromptCategoryLabel(prompt.category)}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="secondary">
+                        {getPromptCategoryLabel(prompt.category)}
+                      </Badge>
+                      {prompt.status === "hidden" && (
+                        <Badge variant="outline">숨김</Badge>
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground">
                       {formatDate(prompt.createdAt)}
                     </span>

@@ -26,6 +26,7 @@ interface PromptDetailData {
   body: string;
   category: string;
   tags: string[];
+  status: PromptRow["status"];
   authorName: string;
   copyCount: number;
   likesCount: number;
@@ -55,7 +56,6 @@ export function PromptDetail({ promptId }: { promptId: string }) {
         "id, author_id, title, description, body, category, tags, status, view_count, copy_count, created_at, updated_at, profiles!prompts_author_id_fkey(username)"
       )
       .eq("id", promptId)
-      .eq("status", "published")
       .maybeSingle();
 
     if (error) {
@@ -97,6 +97,7 @@ export function PromptDetail({ promptId }: { promptId: string }) {
       body: row.body,
       category: row.category,
       tags: row.tags ?? [],
+      status: row.status,
       authorName: row.profiles?.username ?? "익명",
       copyCount: row.copy_count,
       likesCount: likeRows?.length ?? 0,
@@ -146,11 +147,13 @@ export function PromptDetail({ promptId }: { promptId: string }) {
       toast.success("프롬프트를 복사했습니다.");
       setTimeout(() => setCopied(false), 1600);
 
-      void supabase.rpc("increment_prompt_copy_count", {
-        target_prompt_id: prompt.id,
-      });
+      if (prompt.status === "published") {
+        void supabase.rpc("increment_prompt_copy_count", {
+          target_prompt_id: prompt.id,
+        });
 
-      setPrompt({ ...prompt, copyCount: prompt.copyCount + 1 });
+        setPrompt({ ...prompt, copyCount: prompt.copyCount + 1 });
+      }
     } catch {
       toast.error("브라우저 복사 권한을 확인하세요.");
     }
@@ -229,6 +232,7 @@ export function PromptDetail({ promptId }: { promptId: string }) {
             <Badge variant="secondary">
               {getPromptCategoryLabel(prompt.category)}
             </Badge>
+            {prompt.status === "hidden" && <Badge variant="outline">숨김</Badge>}
             <span className="text-sm text-muted-foreground">
               by {prompt.authorName}
             </span>

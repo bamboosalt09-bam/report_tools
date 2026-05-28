@@ -6,6 +6,8 @@ const navItems = [
   { href: "/plain-text", label: "서식" },
   { href: "/date-calculator", label: "날짜" },
   { href: "/math", label: "수식" },
+  { href: "/keyboard-converter", label: "오타" },
+  { href: "/dummy-text", label: "더미" },
   { href: "/convert/image", label: "이미지" },
   { href: "/convert/pdf", label: "PDF" },
   { href: "/prompts", label: "프롬프트" },
