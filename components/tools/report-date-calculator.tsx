@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, Check, ClipboardCopy, RotateCcw } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCopy,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +34,7 @@ interface DateResult {
 
 function parseDateInput(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return new Date();
   return new Date(year, month - 1, day);
 }
 
@@ -51,6 +59,10 @@ function endOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 }
 
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
 function mondayOfWeek(date: Date): Date {
   const offset = (date.getDay() + 6) % 7;
   return addDays(date, -offset);
@@ -66,6 +78,25 @@ function formatDate(date: Date): string {
 
 function formatDateWithWeekday(date: Date): string {
   return `${formatDate(date)} (${weekdays[date.getDay()]})`;
+}
+
+function isSameDate(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function getMonthTitle(date: Date): string {
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+}
+
+function buildCalendarDays(monthDate: Date): Date[] {
+  const firstDay = startOfMonth(monthDate);
+  const gridStart = addDays(firstDay, -firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
 }
 
 function getIsoWeek(date: Date): { year: number; week: number } {
@@ -138,10 +169,39 @@ function buildResults(baseDate: Date): DateResult[] {
 
 export function ReportDateCalculator() {
   const [baseDateValue, setBaseDateValue] = useState(todayInputValue);
+  const [calendarMonthValue, setCalendarMonthValue] = useState(() =>
+    toDateInputValue(startOfMonth(new Date()))
+  );
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const baseDate = useMemo(() => parseDateInput(baseDateValue), [baseDateValue]);
+  const today = useMemo(() => new Date(), []);
+  const calendarMonth = useMemo(
+    () => parseDateInput(calendarMonthValue),
+    [calendarMonthValue]
+  );
+  const calendarDays = useMemo(
+    () => buildCalendarDays(calendarMonth),
+    [calendarMonth]
+  );
   const results = useMemo(() => buildResults(baseDate), [baseDate]);
+
+  const updateBaseDate = (date: Date) => {
+    setBaseDateValue(toDateInputValue(date));
+    setCalendarMonthValue(toDateInputValue(startOfMonth(date)));
+    setCopiedId(null);
+  };
+
+  const moveCalendarMonth = (amount: number) => {
+    const next = new Date(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth() + amount,
+      1
+    );
+    setCalendarMonthValue(toDateInputValue(next));
+  };
+
+  const resetToday = () => updateBaseDate(new Date());
 
   const copy = async (result: DateResult) => {
     try {
@@ -157,21 +217,84 @@ export function ReportDateCalculator() {
   return (
     <div className="space-y-5">
       <Card>
-        <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-1">
-            <Label htmlFor="base-date">기준일</Label>
-            <Input
-              id="base-date"
-              type="date"
-              value={baseDateValue}
-              onChange={(event) => setBaseDateValue(event.target.value)}
-              className="w-[180px]"
-            />
+        <CardContent className="space-y-5 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="base-date">기준일</Label>
+              <Input
+                id="base-date"
+                type="date"
+                value={baseDateValue}
+                onChange={(event) =>
+                  updateBaseDate(parseDateInput(event.target.value))
+                }
+                className="w-[180px]"
+              />
+            </div>
+            <Button variant="outline" onClick={resetToday}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              오늘
+            </Button>
           </div>
-          <Button variant="outline" onClick={() => setBaseDateValue(todayInputValue())}>
-            <RotateCcw className="mr-2 h-4 w-4" />
-            오늘
-          </Button>
+
+          <div className="rounded-lg border bg-background p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="이전 달"
+                onClick={() => moveCalendarMonth(-1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <p className="text-sm font-semibold">{getMonthTitle(calendarMonth)}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="다음 달"
+                onClick={() => moveCalendarMonth(1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+              {weekdays.map((weekday) => (
+                <div key={weekday} className="py-1 font-medium">
+                  {weekday}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((date) => {
+                const isCurrentMonth = date.getMonth() === calendarMonth.getMonth();
+                const isSelected = isSameDate(date, baseDate);
+                const isToday = isSameDate(date, today);
+
+                return (
+                  <button
+                    key={toDateInputValue(date)}
+                    type="button"
+                    onClick={() => updateBaseDate(date)}
+                    className={[
+                      "flex aspect-square min-h-9 items-center justify-center rounded-md border text-sm transition-colors",
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-transparent hover:border-border hover:bg-accent",
+                      !isCurrentMonth && !isSelected
+                        ? "text-muted-foreground/45"
+                        : "",
+                      isToday && !isSelected ? "font-semibold text-primary" : "",
+                    ].join(" ")}
+                    aria-pressed={isSelected}
+                  >
+                    {date.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </CardContent>
       </Card>
 

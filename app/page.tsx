@@ -74,7 +74,7 @@ const tools = [
     href: "/date-calculator",
     title: "날짜 계산기",
     description:
-      "+30일, 이번 주 금요일, 월말 날짜와 ISO 주차를 바로 계산하고 복사합니다.",
+      "달력에서 기준일을 고르고 +30일, 이번 주 금요일, 월말 날짜와 ISO 주차를 복사합니다.",
     icon: CalendarDays,
   },
 ];
