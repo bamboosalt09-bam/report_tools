@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { Check, Copy, Heart, LogOut, Plus, Search, UserRound } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Heart,
+  LogOut,
+  Plus,
+  Search,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -68,9 +77,13 @@ export function PromptCommunity() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<"user" | "admin" | null>(
+    null
+  );
 
   const user = session?.user ?? null;
   const verified = isEmailVerified(user);
+  const isAdmin = currentRole === "admin";
 
   const loadPrompts = useCallback(async () => {
     if (!supabase) {
@@ -159,6 +172,36 @@ export function PromptCommunity() {
 
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const client = supabase;
+    let ignore = false;
+
+    async function loadCurrentRole() {
+      if (!user) {
+        setCurrentRole(null);
+        return;
+      }
+
+      const { data } = await client
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!ignore) {
+        setCurrentRole(data?.role ?? null);
+      }
+    }
+
+    void loadCurrentRole();
+
+    return () => {
+      ignore = true;
+    };
+  }, [supabase, user]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -458,6 +501,14 @@ export function PromptCommunity() {
                 ) : (
                   <Button className="w-full" disabled>
                     <Plus className="mr-2 h-4 w-4" />새 프롬프트 등록
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/admin/prompts">
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      프롬프트 관리
+                    </Link>
                   </Button>
                 )}
                 <Button variant="outline" className="w-full" onClick={handleSignOut}>
