@@ -55,7 +55,7 @@ export function PromptDetail({ promptId }: { promptId: string }) {
     const { data, error } = await supabase
       .from("prompts")
       .select(
-        "id, author_id, title, description, body, category, tags, status, view_count, copy_count, created_at, updated_at, profiles(username)"
+        "id, author_id, title, description, body, category, tags, status, view_count, copy_count, created_at, updated_at, profiles!prompts_author_id_fkey(username)"
       )
       .eq("id", promptId)
       .eq("status", "published")
